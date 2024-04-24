@@ -1,66 +1,110 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Broadcasting Example
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+https://laravel.com/docs/10.x/broadcasting
 
-## About Laravel
+## Stacks version
+- **Laravel**: 10
+- **PHP**: 8.3
+- **Node**: 20.12
+- **npm**: 10.5
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Installation
+To install the required packages, run the following commands:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```bash
+## Install Pusher PHP Server package
+composer require pusher/pusher-php-server
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Install Laravel Echo and Pusher JavaScript libraries
+npm install --save-dev laravel-echo pusher-js
+```
 
-## Learning Laravel
+## Configuration
+Update your `.env` file to use the Pusher broadcasting driver:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+```dotenv
+BROADCAST_DRIVER=pusher
+QUEUE_CONNECTION=sync
+#QUEUE_CONNECTION=redis // Uncomment and set up if you want to use Redis for queue
+```
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Usage
+### Create Web Routes
+Define a web route to trigger the event:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```php
+use App\Http\Controllers\StudentController;
 
-## Laravel Sponsors
+Route::get('ping', [StudentController::class, 'index']);
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Dispatch Event inside Controller
+In your controller, dispatch the `PingEvent`:
 
-### Premium Partners
+```php
+public function index()
+{
+    event(new PingEvent('sample data'));
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+    return "ping";
+}
+```
 
-## Contributing
+### Create `PingEvent` Event
+Create the `PingEvent` event class:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```php
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 
-## Code of Conduct
+class PingEvent implements ShouldBroadcast
+{
+    public function __construct(public string $data)
+    {
+        //
+    }
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+    // Other methods...
+}
+```
 
-## Security Vulnerabilities
+### Broadcasting Setup
+Ensure broadcasting snippets are enabled in your `bootstrap.js` file:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```javascript
+import Echo from 'laravel-echo';
 
-## License
+window.Pusher = require('pusher-js');
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+window.Echo = new Echo({
+    broadcaster: 'pusher',
+    key: process.env.VITE_PUSHER_APP_KEY,
+    cluster: process.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
+    wsHost: process.env.VITE_PUSHER_HOST ? process.env.VITE_PUSHER_HOST : `ws-${process.env.VITE_PUSHER_APP_CLUSTER}.pusher.com`,
+    wsPort: process.env.VITE_PUSHER_PORT ?? 80,
+    wssPort: process.env.VITE_PUSHER_PORT ?? 443,
+    forceTLS: (process.env.VITE_PUSHER_SCHEME ?? 'https') === 'https',
+    enabledTransports: ['ws', 'wss']
+});
+```
+
+### Define Channel in `app.js`
+Listen for the event on the specified channel:
+
+```javascript
+Echo.channel('ping-channel')
+    .listen('.ping-alias', (e) => {
+        console.log('pong!');
+        console.log({ e });
+    });
+```
+
+### Include JavaScript in Blade
+In your blade file, include the JavaScript:
+
+```php
+<head>
+    <!-- Other head content -->
+    @vite('resources/js/app.js')
+</head>
+```
