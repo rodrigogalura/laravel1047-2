@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Socialite;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Auth;
+use Hash;
 use Socialite;
 
 class GoogleAuthController extends Controller
@@ -23,6 +24,7 @@ class GoogleAuthController extends Controller
         ], [
             'name' => $googleUser->getName(),
             'email' => $googleUser->getEmail(),
+            'password' => Hash::make('password'),
         ]);
 
         Auth::login($user);
